@@ -1,47 +1,59 @@
-﻿from io_utils import print_menu, get_class_input, display_schedule, load_schedule_from_file, save_schedule_to_file
+from pathlib import Path
+
+from io_utils import (
+    ScheduleLoadError,
+    display_schedule,
+    get_class_input,
+    load_schedule_from_file,
+    print_menu,
+    save_schedule_to_file,
+)
 from planner_logic import add_class, search_lessons
 
-def main():
-    filepath = "data/schedule.txt"
-    
-    # Завантажуємо дані при старті програми
-    schedule = load_schedule_from_file(filepath)
-    
+
+SCHEDULE_PATH = Path(__file__).absolute().parent.parent / "data" / "schedule.json"
+
+
+def main() -> None:
+    try:
+        schedule = load_schedule_from_file(SCHEDULE_PATH)
+    except ScheduleLoadError as error:
+        print("Unable to load schedule: {}".format(error))
+        return
+
     while True:
         choice = print_menu()
-        
-        if choice == '1':
+
+        if choice == "1":
             day, time, subject = get_class_input()
-            
-            # Запам'ятовуємо довжину розкладу ДО додавання
             old_length = len(schedule)
-            
             schedule = add_class(schedule, day, time, subject)
-            
-            # Якщо довжина змінилася, значить заняття додалося
+
             if len(schedule) > old_length:
-                save_schedule_to_file(filepath, schedule)
-                print("✅ Заняття успішно додано та збережено у файл!")
+                save_schedule_to_file(SCHEDULE_PATH, schedule)
+                print("Lesson added and saved.")
             else:
-                print("❌ Помилка: Заняття не додано (можливо, порожня назва).")
-            
-        elif choice == '2':
+                print("Lesson was not added; the subject may be empty.")
+
+        elif choice == "2":
             display_schedule(schedule)
-            
-        elif choice == '3':
-            query = input("Введіть назву предмета для пошуку: ")
+
+        elif choice == "3":
+            query = input("Enter a subject to search for: ")
             results = search_lessons(schedule, query)
             if results:
-                print("\nЗнайдені заняття:")
+                print("\nMatching lessons:")
                 display_schedule(results)
             else:
-                print("Нічого не знайдено.")
-                
-        elif choice == '4':
-            print("Вихід з програми...")
+                print("No lessons found.")
+
+        elif choice == "4":
+            print("Exiting the planner.")
             break
+
         else:
-            print("❌ Невірний вибір. Спробуйте ще раз.")
+            print("Invalid option. Choose 1, 2, 3, or 4.")
+
 
 if __name__ == "__main__":
     main()
