@@ -74,8 +74,8 @@ def print_menu() -> str:
 
 
 def get_class_input() -> tuple:
-    """Prompt for lesson details; weekday names remain Ukrainian for now."""
-    day = input("Day of week (enter a Ukrainian name or abbreviation): ")
+    """Prompt for a lesson's weekday, time, and subject."""
+    day = input("Day of week (e.g. Monday or Mon): ")
     time = input("Time (e.g. 08:30): ")
     subject = input("Subject: ")
     return day, time, subject
