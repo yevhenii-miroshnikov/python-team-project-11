@@ -1,52 +1,95 @@
-﻿def load_schedule_from_file(filepath: str) -> list:
-    """Зчитує розклад із текстового файлу при запуску програми."""
-    schedule = []
+import json
+from pathlib import Path
+from typing import Dict, List, Union
+
+
+REQUIRED_FIELDS = ("day", "time", "subject")
+
+
+class ScheduleLoadError(Exception):
+    """Raised when a schedule file cannot be read or validated."""
+
+
+def load_schedule_from_file(filepath: Union[str, Path]) -> List[Dict[str, str]]:
+    """Load and validate a JSON schedule; a missing file means no lessons yet."""
+    path = Path(filepath)
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            for line in lines:
-                # Розбиваємо рядок на частини
-                day, time, subject = line.strip().split(" | ")
-                schedule.append({'day': day, 'time': time, 'subject': subject})
+        with path.open("r", encoding="utf-8") as schedule_file:
+            schedule = json.load(schedule_file)
     except FileNotFoundError:
-        print("Файл розкладу не знайдено. Починаємо з чистого аркуша!")
-    except ValueError:
-        print("Помилка формату даних у файлі!")
-    
+        return []
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ScheduleLoadError(
+            "The schedule file is not valid UTF-8 JSON: {}".format(error)
+        ) from error
+    except OSError as error:
+        raise ScheduleLoadError(
+            "The schedule file could not be read: {}".format(error)
+        ) from error
+
+    if not isinstance(schedule, list):
+        raise ScheduleLoadError("The schedule JSON root must be an array.")
+
+    for index, lesson in enumerate(schedule, start=1):
+        if not isinstance(lesson, dict):
+            raise ScheduleLoadError(
+                "Schedule entry {} must be a JSON object.".format(index)
+            )
+        for field in REQUIRED_FIELDS:
+            if field not in lesson:
+                raise ScheduleLoadError(
+                    "Schedule entry {} is missing the '{}' field.".format(
+                        index, field
+                    )
+                )
+            if not isinstance(lesson[field], str):
+                raise ScheduleLoadError(
+                    "The '{}' field in schedule entry {} must be a string.".format(
+                        field, index
+                    )
+                )
+
     return schedule
 
-def save_schedule_to_file(filepath: str, schedule: list) -> None:
-    """Зберігає весь розклад у текстовий файл."""
-    with open(filepath, "w", encoding="utf-8") as f:
-        for item in schedule:
-            # Склеюємо словник назад у рядок
-            f.write(f"{item['day']} | {item['time']} | {item['subject']}\n")
 
-def print_menu():
-    """Виводить головне меню програми."""
-    print("\n--- Планувальник навчального тижня ---")
-    print("1. Додати заняття")
-    print("2. Переглянути весь розклад")
-    print("3. Пошук за предметом")
-    print("4. Вихід")
-    return input("Оберіть дію: ")
+def save_schedule_to_file(
+    filepath: Union[str, Path], schedule: List[Dict[str, str]]
+) -> None:
+    """Save the complete schedule as readable UTF-8 JSON."""
+    path = Path(filepath)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as schedule_file:
+        json.dump(schedule, schedule_file, ensure_ascii=False, indent=2)
+        schedule_file.write("\n")
 
-def get_class_input():
-    """Запитує дані у користувача."""
-    day = input("День тижня: ")
-    time = input("Час (напр. 08:30): ")
-    subject = input("Назва предмета: ")
+
+def print_menu() -> str:
+    """Display the main menu and return the selected option."""
+    print("\n--- Weekly Study Planner ---")
+    print("1. Add a lesson")
+    print("2. View the schedule")
+    print("3. Search by subject")
+    print("4. Exit")
+    return input("Choose an option: ")
+
+
+def get_class_input() -> tuple:
+    """Prompt for lesson details; weekday names remain Ukrainian for now."""
+    day = input("Day of week (enter a Ukrainian name or abbreviation): ")
+    time = input("Time (e.g. 08:30): ")
+    subject = input("Subject: ")
     return day, time, subject
 
-def format_lesson(lesson):
-    """Форматує словник заняття у зручний рядок."""
-    return f"[{lesson['day']}] {lesson['time']} - {lesson['subject']}"
 
-def display_schedule(schedule):
-    """Виводить список занять на екран."""
+def format_lesson(lesson: Dict[str, str]) -> str:
+    """Format one lesson for display."""
+    return "[{}] {} - {}".format(lesson["day"], lesson["time"], lesson["subject"])
+
+
+def display_schedule(schedule: List[Dict[str, str]]) -> None:
+    """Print all lessons, or an empty-schedule message."""
     if not schedule:
-        print("Розклад порожній.")
+        print("The schedule is empty.")
         return
-    for item in schedule:
-        print(format_lesson(item))
-
+    for lesson in schedule:
+        print(format_lesson(lesson))
